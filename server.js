@@ -20,11 +20,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 
 
-app.get('/location', (request, response) => {
-  searchToLatLong(request.query.data)
-    .then(location => response.send(location))
-    .catch(error => handleError(error, response));
-})
+app.get('/location', searchToLatLong);
 
 app.get('/weather', getWeather);
 app.get('/yelp', getYelp);
@@ -33,29 +29,40 @@ app.get('/movies', getMovie);
 app.listen(PORT, () => console.log(`Listsening on ${PORT}`));
 
 //Helper Functions
-function searchToLatLong(query) {
+function searchToLatLong(query, response) {
 
   checkLocation({
-    tableName = 
+    tableName: Location.tableName,
+
+    query: query,
+
+    cacheHit: function(result) {
+      response.send(result);
+    },
+
+    cacheMiss: function() {
+
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GOOGLE_API_KEY}`;
+
+      return superagent.get(url)
+        .then(result => {
+          // return {
+          //   search_query: query,
+          //   formatted_query: result.body.results[0].formatted_address,
+          //   latitude: result.body.results[0].geometry.location.lat,
+          //   longitude: result.body.results[0].geometry.location.lng
+          // }
+          response.send(new Location(query, result));
+        })
+        .catch(error => handleError(error));
+    }
+
   });
 
 
 
 
 
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GOOGLE_API_KEY}`;
-
-  return superagent.get(url)
-    .then(result => {
-      // return {
-      //   search_query: query,
-      //   formatted_query: result.body.results[0].formatted_address,
-      //   latitude: result.body.results[0].geometry.location.lat,
-      //   longitude: result.body.results[0].geometry.location.lng
-      // }
-      response.send(new Location(request, result));
-    })
-    .catch(error => handleError(error));
 }
 
 function getWeather (request, response) {
@@ -103,7 +110,7 @@ function Location(query, result) {
   this.formatted_query = result.body.results[0].formatted_address;
   this.latitude = result.body.results[0].geometry.location.lat;
   this.longitude = result.body.results[0].geometry.location.lng;
-  tableName = locations;
+  // tableName = locations;
 }
 
 function Weather (day) {
