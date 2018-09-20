@@ -5,11 +5,15 @@ const express = require('express');
 
 const superagent = require('superagent');
 const cors = require('cors');
+const pg = require('pg');
 
 //this allows us to join front-end and back-end files from different folders
 
 //loads environment variables from .env
 require('dotenv').config();
+
+const client = new pg.Client(process.env.DATABASE_URL);
+client.connect();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -105,4 +109,22 @@ function Movie (film) {
   this.image_url = `https://image.tmdb.org/t/p/w500${film.poster_path}`;
   this.popularity = film.popularity;
   this.released_on = film.release_date;
+}
+
+//SQL Codes
+const checkLocation = (location) => {
+  const SQL = `SELECT * FROM locations WHERE search_query=$1;`;
+  const values = [location.query];
+
+  return client.query(SQL, values)
+    .then(result => {
+      //if exits in db
+      if(result.rowCount > 0) {
+        location.cacheHit(result.rows[0]);
+      }
+      else {
+        location.chacheMiss();
+      }
+    })
+    .catch(console.error);
 }
