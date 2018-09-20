@@ -1,5 +1,5 @@
 {
-  "name": "lab-07-back-end",
+  "name": "lab-08-back-end",
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
@@ -9,15 +9,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jeffborda/lab-07-back-end.git"
+    "url": "git+https://github.com/jeffborda/lab-08-back-end.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/jeffborda/lab-07-back-end/issues"
+    "url": "https://github.com/jeffborda/lab-08-back-end/issues"
   },
-  "homepage": "https://github.com/jeffborda/lab-07-back-end#readme",
+  "homepage": "https://github.com/jeffborda/lab-08-back-end#readme",
   "dependencies": {
     "cors": "^2.8.4",
     "dotenv": "^6.0.0",

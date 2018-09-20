@@ -5,22 +5,22 @@ const express = require('express');
 
 const superagent = require('superagent');
 const cors = require('cors');
+const pg = require('pg');
 
 //this allows us to join front-end and back-end files from different folders
 
 //loads environment variables from .env
 require('dotenv').config();
 
+const client = new pg.Client(process.env.DATABASE_URL);
+client.connect();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
 
 
-app.get('/location', (request, response) => {
-  searchToLatLong(request.query.data)
-    .then(location => response.send(location))
-    .catch(error => handleError(error, response));
-})
+app.get('/location', searchToLatLong);
 
 app.get('/weather', getWeather);
 app.get('/yelp', getYelp);
@@ -29,19 +29,40 @@ app.get('/movies', getMovie);
 app.listen(PORT, () => console.log(`Listsening on ${PORT}`));
 
 //Helper Functions
-function searchToLatLong(query) {
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GOOGLE_API_KEY}`;
+function searchToLatLong(query, response) {
 
-  return superagent.get(url)
-    .then(result => {
-      return {
-        search_query: query,
-        formatted_query: result.body.results[0].formatted_address,
-        latitude: result.body.results[0].geometry.location.lat,
-        longitude: result.body.results[0].geometry.location.lng
-      }
-    })
-    .catch(error => handleError(error));
+  checkLocation({
+    tableName: Location.tableName,
+
+    query: query,
+
+    cacheHit: function(result) {
+      response.send(result);
+    },
+
+    cacheMiss: function() {
+
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GOOGLE_API_KEY}`;
+
+      return superagent.get(url)
+        .then(result => {
+          // return {
+          //   search_query: query,
+          //   formatted_query: result.body.results[0].formatted_address,
+          //   latitude: result.body.results[0].geometry.location.lat,
+          //   longitude: result.body.results[0].geometry.location.lng
+          // }
+          response.send(new Location(query, result));
+        })
+        .catch(error => handleError(error));
+    }
+
+  });
+
+
+
+
+
 }
 
 function getWeather (request, response) {
@@ -84,6 +105,14 @@ function handleError (error, response) {
 }
 
 //Constructors
+function Location(query, result) {
+  this.search_query = query;
+  this.formatted_query = result.body.results[0].formatted_address;
+  this.latitude = result.body.results[0].geometry.location.lat;
+  this.longitude = result.body.results[0].geometry.location.lng;
+  // tableName = locations;
+}
+
 function Weather (day) {
   this.time = new Date(day.time * 1000).toString().slice(0, 15);
   this.forecast = day.summary;
@@ -105,4 +134,22 @@ function Movie (film) {
   this.image_url = `https://image.tmdb.org/t/p/w500${film.poster_path}`;
   this.popularity = film.popularity;
   this.released_on = film.release_date;
+}
+
+//SQL Codes
+const checkLocation = (location) => {
+  const SQL = `SELECT * FROM locations WHERE search_query=$1;`;
+  const values = [location.query];
+
+  return client.query(SQL, values)
+    .then(result => {
+      //if exits in db
+      if(result.rowCount > 0) {
+        location.cacheHit(result.rows[0]);
+      }
+      else {
+        location.cacheMiss();
+      }
+    })
+    .catch(console.error);
 }
