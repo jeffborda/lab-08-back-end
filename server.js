@@ -34,16 +34,26 @@ app.listen(PORT, () => console.log(`Listsening on ${PORT}`));
 
 //Helper Functions
 function searchToLatLong(query) {
+
+  checkLocation({
+    tableName = 
+  });
+
+
+
+
+
   const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GOOGLE_API_KEY}`;
 
   return superagent.get(url)
     .then(result => {
-      return {
-        search_query: query,
-        formatted_query: result.body.results[0].formatted_address,
-        latitude: result.body.results[0].geometry.location.lat,
-        longitude: result.body.results[0].geometry.location.lng
-      }
+      // return {
+      //   search_query: query,
+      //   formatted_query: result.body.results[0].formatted_address,
+      //   latitude: result.body.results[0].geometry.location.lat,
+      //   longitude: result.body.results[0].geometry.location.lng
+      // }
+      response.send(new Location(request, result));
     })
     .catch(error => handleError(error));
 }
@@ -88,6 +98,14 @@ function handleError (error, response) {
 }
 
 //Constructors
+function Location(query, result) {
+  this.search_query = query;
+  this.formatted_query = result.body.results[0].formatted_address;
+  this.latitude = result.body.results[0].geometry.location.lat;
+  this.longitude = result.body.results[0].geometry.location.lng;
+  tableName = locations;
+}
+
 function Weather (day) {
   this.time = new Date(day.time * 1000).toString().slice(0, 15);
   this.forecast = day.summary;
@@ -123,7 +141,7 @@ const checkLocation = (location) => {
         location.cacheHit(result.rows[0]);
       }
       else {
-        location.chacheMiss();
+        location.cacheMiss();
       }
     })
     .catch(console.error);
