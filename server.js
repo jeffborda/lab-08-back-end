@@ -29,6 +29,7 @@ app.listen(PORT, () => console.log(`Listsening on ${PORT}`));
 
 //Helper Functions
 function searchToLatLong(request, response) {
+  console.log('testing console log inside searchToLatLong()');
 
   checkLocation({
     tableName: Location.tableName,
@@ -41,16 +42,11 @@ function searchToLatLong(request, response) {
 
     cacheMiss: function() {
 
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${request}&key=${process.env.GOOGLE_API_KEY}`;
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${this.query}&key=${process.env.GOOGLE_API_KEY}`;
 
       return superagent.get(url)
         .then(result => {
-          // return {
-          //   search_query: query,
-          //   formatted_query: result.body.results[0].formatted_address,
-          //   latitude: result.body.results[0].geometry.location.lat,
-          //   longitude: result.body.results[0].geometry.location.lng
-          // }
+
           const location = new Location(this.query, result);
           location.save()
             .then(location => response.send(location));
@@ -58,10 +54,6 @@ function searchToLatLong(request, response) {
         .catch(error => handleError(error));
     }
   })
-
-
-
-
 
 }
 
