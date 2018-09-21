@@ -30,7 +30,6 @@ app.listen(PORT, () => console.log(`Listening on ${PORT}`));
 //Helper Functions
 function searchToLatLong(request, response) {
   checkLocation({
-    // tableName: Location.tableName,
     query: request.query.data,
 
     cacheHit: function(result) {
@@ -51,12 +50,23 @@ function searchToLatLong(request, response) {
 }
 
 function getWeather (request, response) {
-  const url = `https://api.darksky.net/forecast/${process.env.DARK_SKY_API}/${request.query.data.latitude},${request.query.data.longitude}`;
-  return superagent.get(url)
-    .then((result) => {
-      response.send(result.body.daily.data.map((day) => new Weather(day)));
-    })
-    .catch(error => handleError(error, response));
+  Weather.lookUp({
+    tableName: Weather.tableName,
+
+    cacheMiss: function() {
+      const url = `https://api.darksky.net/forecast/${process.env.DARK_SKY_API}/${request.query.data.latitude},${request.query.data.longitude}`;
+      return superagent.get(url)
+        .then((result) => {
+          response.send(result.body.daily.data.map((day) => new Weather(day)));
+        })
+        .catch(error => handleError(error, response));
+    }
+
+    // cacheHit: function() {
+
+    // }
+
+  })
 }
 
 function getYelp (request, response) {
@@ -94,8 +104,9 @@ function Location(query, result) {
   this.formatted_query = result.body.results[0].formatted_address;
   this.latitude = result.body.results[0].geometry.location.lat;
   this.longitude = result.body.results[0].geometry.location.lng;
-  // tableName = locations;
 }
+
+Location.tableName = 'locations';
 
 Location.prototype.save = function() {
   const SQL = `INSERT INTO locations (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING id;`;
@@ -112,6 +123,8 @@ function Weather (day) {
   this.forecast = day.summary;
 }
 
+Location.tableName = 'weathers';
+
 function Yelp (food) {
   this.name = food.name;
   this.image_url = food.image_url;
@@ -119,6 +132,8 @@ function Yelp (food) {
   this.rating = food.rating;
   this.url = food.url;
 }
+
+Location.tableName = 'yelps';
 
 function Movie (film) {
   this.title = film.title;
@@ -130,19 +145,41 @@ function Movie (film) {
   this.released_on = film.release_date;
 }
 
+Location.tableName = 'movies';
+
+Weather.lookUp = lookUp;
+Movie.lookUp = lookUp;
+Yelp.lookUp = lookUp;
+
+
 //SQL
-const checkLocation = (location) => {
+function checkLocation(location) {
   const SQL = `SELECT * FROM locations WHERE search_query=$1;`;
   const values = [location.query];
 
   return client.query(SQL, values)
     .then(result => {
-      //if exits in db
       if(result.rowCount > 0) {
         location.cacheHit(result.rows[0]);
       }
       else {
         location.cacheMiss();
+      }
+    })
+    .catch(console.error);
+}
+
+// Generic lookUp function
+function lookUp(options) {
+  const SQL = `SELECT * FROM ${options.tableName} WHERE search_query=$1;`;
+  const values = [options.location];
+
+  client.query(SQL, values)
+    .then(result => {
+      if(result.rowCount > 0) {
+        options.cacheHit(result.rows);
+      } else {
+        options.cacheMiss();
       }
     })
     .catch(console.error);
