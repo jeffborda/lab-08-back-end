@@ -25,14 +25,12 @@ app.get('/weather', getWeather);
 app.get('/yelp', getYelp);
 app.get('/movies', getMovie);
 
-app.listen(PORT, () => console.log(`Listsening on ${PORT}`));
+app.listen(PORT, () => console.log(`Listening on ${PORT}`));
 
 //Helper Functions
 function searchToLatLong(request, response) {
-
   checkLocation({
-    tableName: Location.tableName,
-
+    // tableName: Location.tableName,
     query: request.query.data,
 
     cacheHit: function(result) {
@@ -40,17 +38,9 @@ function searchToLatLong(request, response) {
     },
 
     cacheMiss: function() {
-
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${request}&key=${process.env.GOOGLE_API_KEY}`;
-
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${this.query}&key=${process.env.GOOGLE_API_KEY}`;
       return superagent.get(url)
         .then(result => {
-          // return {
-          //   search_query: query,
-          //   formatted_query: result.body.results[0].formatted_address,
-          //   latitude: result.body.results[0].geometry.location.lat,
-          //   longitude: result.body.results[0].geometry.location.lng
-          // }
           const location = new Location(this.query, result);
           location.save()
             .then(location => response.send(location));
@@ -58,11 +48,6 @@ function searchToLatLong(request, response) {
         .catch(error => handleError(error));
     }
   })
-
-
-
-
-
 }
 
 function getWeather (request, response) {
@@ -98,7 +83,6 @@ function getMovie (request, response) {
     .catch(error => handleError(error, response));
 }
 
-
 function handleError (error, response) {
   console.error(error);
   if(response) return response.status(500).send('Sorry something went terribly wrong.');
@@ -116,14 +100,12 @@ function Location(query, result) {
 Location.prototype.save = function() {
   const SQL = `INSERT INTO locations (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING id;`;
   const values = [this.search_query, this.formatted_query, this.latitude, this.longitude];
-
   return client.query(SQL, values)
     .then(result => {
       this.id = result.rows[0].id;
       return this;
     });
 }
-
 
 function Weather (day) {
   this.time = new Date(day.time * 1000).toString().slice(0, 15);
