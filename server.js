@@ -148,7 +148,7 @@ function Movie (film) {
   this.released_on = film.release_date;
 }
 
-//SQL Codes
+//SQL
 const checkLocation = (location) => {
   const SQL = `SELECT * FROM locations WHERE search_query=$1;`;
   const values = [location.query];
