@@ -101,13 +101,30 @@ function getYelp (request, response) {
 }
 
 function getMovie (request, response) {
-  const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.THE_MOVIE_DB_API}&query=${request.query.data.search_query}`;
+  Movie.lookUp({
+    tableName: Movie.tableName,
 
-  superagent.get(url)
-    .then((result) => {
-      response.send(result.body.results.map( movie => new Movie(movie)));
-    })
-    .catch(error => handleError(error, response));
+    location: request.query.data.id,
+
+    cacheHit: function(result) {
+      response.send(result);
+    },
+
+    cacheMiss: function() {
+      const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.THE_MOVIE_DB_API}&query=${request.query.data.search_query}`;
+
+      superagent.get(url)
+        .then((result) => {
+          const movieSummaries = result.body.results.map(movie => {
+            const film = new Movie(movie);
+            film.save(request.query.data.id);
+            return film;
+          });
+          response.send(movieSummaries);
+        })
+        .catch(error => handleError(error, response));
+    }
+  })
 }
 
 function handleError (error, response) {
@@ -115,7 +132,7 @@ function handleError (error, response) {
   if(response) return response.status(500).send('Sorry something went terribly wrong.');
 }
 
-//Constructors
+// Constructors
 // Location constructor
 function Location(query, result) {
   this.search_query = query;
@@ -184,7 +201,6 @@ Yelp.tableName = 'yelps';
 
 Yelp.lookUp = lookUp;
 
-
 Yelp.prototype.save = function(location_id) {
   const SQL = `INSERT INTO ${Yelp.tableName} (name, image_url, price, rating, url, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7);`;
   const values = [this.name, this.image_url, this.price, this.rating, this.url, this.created_at, location_id];
@@ -201,11 +217,19 @@ function Movie (film) {
   this.image_url = `https://image.tmdb.org/t/p/w500${film.poster_path}`;
   this.popularity = film.popularity;
   this.released_on = film.release_date;
+  this.created_at = Date.now();
 }
 
 Movie.tableName = 'movies';
 
 Movie.lookUp = lookUp;
+
+Movie.prototype.save = function(location_id) {
+  const SQL = `INSERT INTO ${Movie.tableName} (title, overview, average_vote, total_votes, image_url, popularity, released_on, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`;
+  const values = [this.title, this.overview, this.average_votes, this.total_votes, this.image_url, this.popularity, this.released_on, this.created_at, location_id];
+
+  client.query(SQL, values);
+}
 
 // Generic lookUp function
 function lookUp(options) {
