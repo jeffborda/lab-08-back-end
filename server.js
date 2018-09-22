@@ -29,7 +29,7 @@ app.listen(PORT, () => console.log(`Listening on ${PORT}`));
 
 //Helper Functions
 function searchToLatLong(request, response) {
-  checkLocation({
+  Location.checkLocation({
     query: request.query.data,
 
     cacheHit: function(result) {
@@ -53,18 +53,27 @@ function getWeather (request, response) {
   Weather.lookUp({
     tableName: Weather.tableName,
 
+    location: request.query.data.id,
+
+    cacheHit: function(result) {
+      response.send(result);
+    },
+
     cacheMiss: function() {
       const url = `https://api.darksky.net/forecast/${process.env.DARK_SKY_API}/${request.query.data.latitude},${request.query.data.longitude}`;
       return superagent.get(url)
         .then((result) => {
-          response.send(result.body.daily.data.map((day) => new Weather(day)));
+
+          const weatherSummaries = result.body.daily.data.map((day) => {
+            const summary = new Weather(day);
+            summary.save(request.query.data.id); //ADDED .id
+            return summary;
+          });
+          response.send(weatherSummaries);
+
         })
         .catch(error => handleError(error, response));
     }
-
-    // cacheHit: function() {
-
-    // }
 
   })
 }
@@ -121,9 +130,19 @@ Location.prototype.save = function() {
 function Weather (day) {
   this.time = new Date(day.time * 1000).toString().slice(0, 15);
   this.forecast = day.summary;
+  this.created_at = Date.now();
 }
 
-Location.tableName = 'weathers';
+Weather.tableName = 'weathers';
+
+Weather.prototype.save = function(location_id) {
+  const SQL = `INSERT INTO ${Weather.tableName} (forecast, time, created_at, location_id) VALUES ($1, $2, $3, $4);`;
+  const values = [this.forecast, this.time, this.created_at, location_id];
+
+  console.log('@@@@@@@@@values', values);
+
+  client.query(SQL, values);
+}
 
 function Yelp (food) {
   this.name = food.name;
@@ -153,7 +172,7 @@ Yelp.lookUp = lookUp;
 
 
 //SQL
-function checkLocation(location) {
+Location.checkLocation = function(location) {
   const SQL = `SELECT * FROM locations WHERE search_query=$1;`;
   const values = [location.query];
 
@@ -171,7 +190,7 @@ function checkLocation(location) {
 
 // Generic lookUp function
 function lookUp(options) {
-  const SQL = `SELECT * FROM ${options.tableName} WHERE search_query=$1;`;
+  const SQL = `SELECT * FROM ${options.tableName} WHERE location_id=$1;`;
   const values = [options.location];
 
   client.query(SQL, values)
@@ -182,5 +201,5 @@ function lookUp(options) {
         options.cacheMiss();
       }
     })
-    .catch(console.error);
+    .catch(console.log('There is an error'));
 }
