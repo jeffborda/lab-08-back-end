@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS movies (
   image_url VARCHAR(255),
   popularity NUMERIC(4, 3),
   released_on VARCHAR(10),
+  created_at BIGINT,
   location_id INTEGER NOT NULL REFERENCES locations(id)
 );
 
@@ -33,5 +34,6 @@ CREATE TABLE IF NOT EXISTS yelps (
   price VARCHAR(5),
   rating NUMERIC(4,1),
   url VARCHAR(255),
+  created_at BIGINT,
   location_id INTEGER NOT NULL REFERENCES locations(id)
 );
