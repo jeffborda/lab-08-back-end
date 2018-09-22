@@ -13,3 +13,25 @@ CREATE TABLE IF NOT EXISTS weathers (
   created_at BIGINT,
   location_id INTEGER NOT NULL REFERENCES locations(id)
 );
+
+CREATE TABLE IF NOT EXISTS movies (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(500),
+  overview VARCHAR(500),
+  average_vote INTEGER,
+  total_votes INTEGER,
+  image_url VARCHAR(255),
+  popularity NUMERIC(4, 3),
+  released_on VARCHAR(10),
+  location_id INTEGER NOT NULL REFERENCES locations(id)
+);
+
+CREATE TABLE IF NOT EXISTS yelps (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255),
+  image_url VARCHAR(255),
+  price VARCHAR(5),
+  rating NUMERIC(4,1),
+  url VARCHAR(255),
+  location_id INTEGER NOT NULL REFERENCES locations(id)
+);
