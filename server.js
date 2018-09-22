@@ -45,14 +45,20 @@ function searchToLatLong(request, response) {
   })
 }
 
-function getWeather (request, response) {
+function getWeather(request, response) {
   Weather.lookUp({
     tableName: Weather.tableName,
 
     location: request.query.data.id,
 
     cacheHit: function(result) {
-      response.send(result);
+      let ageOfResultsInMinutes = (Date.now() - result.rows[0].created_at) / (1000 * 60);
+      if (ageOfResultsInMinutes > 1) {
+        Weather.deleteByLocationId(Weather.tableName, request.query.data.id);
+        this.cacheMiss();
+      } else {
+        response.send(result);
+      }
     },
 
     cacheMiss: function() {
@@ -177,8 +183,8 @@ function Weather (day) {
 }
 
 Weather.tableName = 'weathers';
-
 Weather.lookUp = lookUp;
+Weather.deleteByLocationId = deleteByLocationId;
 
 Weather.prototype.save = function(location_id) {
   const SQL = `INSERT INTO ${Weather.tableName} (forecast, time, created_at, location_id) VALUES ($1, $2, $3, $4);`;
@@ -198,8 +204,8 @@ function Yelp (food) {
 }
 
 Yelp.tableName = 'yelps';
-
 Yelp.lookUp = lookUp;
+Yelp.deleteByLocationId = deleteByLocationId;
 
 Yelp.prototype.save = function(location_id) {
   const SQL = `INSERT INTO ${Yelp.tableName} (name, image_url, price, rating, url, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7);`;
@@ -221,8 +227,8 @@ function Movie (film) {
 }
 
 Movie.tableName = 'movies';
-
 Movie.lookUp = lookUp;
+Movie.deleteByLocationId = deleteByLocationId;
 
 Movie.prototype.save = function(location_id) {
   const SQL = `INSERT INTO ${Movie.tableName} (title, overview, average_vote, total_votes, image_url, popularity, released_on, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`;
@@ -245,4 +251,10 @@ function lookUp(options) {
       }
     })
     .catch(console.log('There is an error'));
+}
+
+// Generic delete row function
+function deleteByLocationId(table, city) {
+  const SQL = `DELETE FROM ${table} WHERE location_id=${city};`;
+  return client.query(SQL);
 }
