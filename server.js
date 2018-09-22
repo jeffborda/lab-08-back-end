@@ -52,11 +52,12 @@ function getWeather(request, response) {
     location: request.query.data.id,
 
     cacheHit: function(result) {
-      let ageOfResultsInMinutes = (Date.now() - result.rows[0].created_at) / (1000 * 60);
-      if (ageOfResultsInMinutes > 1) {
+      let ageOfResultsInMinutes = (Date.now() - result[0].created_at) / (1000 * 60);
+      if (ageOfResultsInMinutes > 60) {
         Weather.deleteByLocationId(Weather.tableName, request.query.data.id);
         this.cacheMiss();
-      } else {
+      }
+      else {
         response.send(result);
       }
     },
@@ -68,7 +69,7 @@ function getWeather(request, response) {
 
           const weatherSummaries = result.body.daily.data.map((day) => {
             const summary = new Weather(day);
-            summary.save(request.query.data.id); //ADDED .id
+            summary.save(request.query.data.id);
             return summary;
           });
           response.send(weatherSummaries);
@@ -85,7 +86,14 @@ function getYelp (request, response) {
     location: request.query.data.id,
 
     cacheHit: function(result) {
-      response.send(result);
+      let ageOfResultsInDays = (Date.now() - result[0].created_at) / (1000 * 60 * 60 * 24);
+      if (ageOfResultsInDays > 30) {
+        Yelp.deleteByLocationId(Yelp.tableName, request.query.data.id);
+        this.cacheMiss();
+      }
+      else {
+        response.send(result);
+      }
     },
 
     cacheMiss: function() {
@@ -113,7 +121,14 @@ function getMovie (request, response) {
     location: request.query.data.id,
 
     cacheHit: function(result) {
-      response.send(result);
+      let ageOfResultsInDays = (Date.now() - result[0].created_at) / (1000 * 60 * 60 * 24);
+      if (ageOfResultsInDays > 30) {
+        Movie.deleteByLocationId(Movie.tableName, request.query.data.id);
+        this.cacheMiss();
+      }
+      else {
+        response.send(result);
+      }
     },
 
     cacheMiss: function() {
@@ -246,7 +261,8 @@ function lookUp(options) {
     .then(result => {
       if(result.rowCount > 0) {
         options.cacheHit(result.rows);
-      } else {
+      }
+      else {
         options.cacheMiss();
       }
     })
