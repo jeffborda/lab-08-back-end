@@ -29,7 +29,6 @@ app.listen(PORT, () => console.log(`Listsening on ${PORT}`));
 
 //Helper Functions
 function searchToLatLong(request, response) {
-  console.log('testing console log inside searchToLatLong()');
 
   checkLocation({
     tableName: Location.tableName,
