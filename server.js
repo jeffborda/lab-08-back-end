@@ -2,12 +2,9 @@
 
 //Application dependencies
 const express = require('express');
-
 const superagent = require('superagent');
 const cors = require('cors');
 const pg = require('pg');
-
-//this allows us to join front-end and back-end files from different folders
 
 //loads environment variables from .env
 require('dotenv').config();
@@ -18,7 +15,6 @@ client.connect();
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
-
 
 app.get('/location', searchToLatLong);
 app.get('/weather', getWeather);
@@ -70,36 +66,65 @@ function getWeather (request, response) {
             return summary;
           });
           response.send(weatherSummaries);
-
         })
         .catch(error => handleError(error, response));
     }
-
   })
 }
 
 function getYelp (request, response) {
-  const url = `https://api.yelp.com/v3/businesses/search?location=${request.query.data.search_query}`;
+  Yelp.lookUp({
+    tableName: Yelp.tableName,
 
-  superagent.get(url)
-    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
-    .then((result) => {
-      const yelpArray = result.body.businesses.map(food => {
-        return new Yelp(food);
-      })
-      response.send(yelpArray);
-    })
-    .catch(error => handleError(error, response));
+    location: request.query.data.id,
+
+    cacheHit: function(result) {
+      response.send(result);
+    },
+
+    cacheMiss: function() {
+      const url = `https://api.yelp.com/v3/businesses/search?location=${request.query.data.search_query}`;
+
+      superagent.get(url)
+        .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+        .then((result) => {
+          const yelpArray = result.body.businesses.map(food => {
+            const summary = new Yelp(food);
+            summary.save(request.query.data.id);
+            return summary;
+          })
+          response.send(yelpArray);
+        })
+        .catch(error => handleError(error, response));
+    }
+  })
 }
 
 function getMovie (request, response) {
-  const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.THE_MOVIE_DB_API}&query=${request.query.data.search_query}`;
+  Movie.lookUp({
+    tableName: Movie.tableName,
 
-  superagent.get(url)
-    .then((result) => {
-      response.send(result.body.results.map( movie => new Movie(movie)));
-    })
-    .catch(error => handleError(error, response));
+    location: request.query.data.id,
+
+    cacheHit: function(result) {
+      response.send(result);
+    },
+
+    cacheMiss: function() {
+      const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.THE_MOVIE_DB_API}&query=${request.query.data.search_query}`;
+
+      superagent.get(url)
+        .then((result) => {
+          const movieSummaries = result.body.results.map(movie => {
+            const film = new Movie(movie);
+            film.save(request.query.data.id);
+            return film;
+          });
+          response.send(movieSummaries);
+        })
+        .catch(error => handleError(error, response));
+    }
+  })
 }
 
 function handleError (error, response) {
@@ -107,7 +132,8 @@ function handleError (error, response) {
   if(response) return response.status(500).send('Sorry something went terribly wrong.');
 }
 
-//Constructors
+// Constructors
+// Location constructor
 function Location(query, result) {
   this.search_query = query;
   this.formatted_query = result.body.results[0].formatted_address;
@@ -117,61 +143,6 @@ function Location(query, result) {
 
 Location.tableName = 'locations';
 
-Location.prototype.save = function() {
-  const SQL = `INSERT INTO locations (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING id;`;
-  const values = [this.search_query, this.formatted_query, this.latitude, this.longitude];
-  return client.query(SQL, values)
-    .then(result => {
-      this.id = result.rows[0].id;
-      return this;
-    });
-}
-
-function Weather (day) {
-  this.time = new Date(day.time * 1000).toString().slice(0, 15);
-  this.forecast = day.summary;
-  this.created_at = Date.now();
-}
-
-Weather.tableName = 'weathers';
-
-Weather.prototype.save = function(location_id) {
-  const SQL = `INSERT INTO ${Weather.tableName} (forecast, time, created_at, location_id) VALUES ($1, $2, $3, $4);`;
-  const values = [this.forecast, this.time, this.created_at, location_id];
-
-  console.log('@@@@@@@@@values', values);
-
-  client.query(SQL, values);
-}
-
-function Yelp (food) {
-  this.name = food.name;
-  this.image_url = food.image_url;
-  this.price = food.price;
-  this.rating = food.rating;
-  this.url = food.url;
-}
-
-Location.tableName = 'yelps';
-
-function Movie (film) {
-  this.title = film.title;
-  this.overview = film.overview;
-  this.average_votes = film.vote_average;
-  this.total_votes = film.vote_count;
-  this.image_url = `https://image.tmdb.org/t/p/w500${film.poster_path}`;
-  this.popularity = film.popularity;
-  this.released_on = film.release_date;
-}
-
-Location.tableName = 'movies';
-
-Weather.lookUp = lookUp;
-Movie.lookUp = lookUp;
-Yelp.lookUp = lookUp;
-
-
-//SQL
 Location.checkLocation = function(location) {
   const SQL = `SELECT * FROM locations WHERE search_query=$1;`;
   const values = [location.query];
@@ -186,6 +157,78 @@ Location.checkLocation = function(location) {
       }
     })
     .catch(console.error);
+}
+
+Location.prototype.save = function() {
+  const SQL = `INSERT INTO locations (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING id;`;
+  const values = [this.search_query, this.formatted_query, this.latitude, this.longitude];
+  return client.query(SQL, values)
+    .then(result => {
+      this.id = result.rows[0].id;
+      return this;
+    });
+}
+
+// Weather constructor
+function Weather (day) {
+  this.time = new Date(day.time * 1000).toString().slice(0, 15);
+  this.forecast = day.summary;
+  this.created_at = Date.now();
+}
+
+Weather.tableName = 'weathers';
+
+Weather.lookUp = lookUp;
+
+Weather.prototype.save = function(location_id) {
+  const SQL = `INSERT INTO ${Weather.tableName} (forecast, time, created_at, location_id) VALUES ($1, $2, $3, $4);`;
+  const values = [this.forecast, this.time, this.created_at, location_id];
+
+  client.query(SQL, values);
+}
+
+// Yelp constructor
+function Yelp (food) {
+  this.name = food.name;
+  this.image_url = food.image_url;
+  this.price = food.price;
+  this.rating = food.rating;
+  this.url = food.url;
+  this.created_at = Date.now();
+}
+
+Yelp.tableName = 'yelps';
+
+Yelp.lookUp = lookUp;
+
+Yelp.prototype.save = function(location_id) {
+  const SQL = `INSERT INTO ${Yelp.tableName} (name, image_url, price, rating, url, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7);`;
+  const values = [this.name, this.image_url, this.price, this.rating, this.url, this.created_at, location_id];
+
+  client.query(SQL, values);
+}
+
+// Movie constructor
+function Movie (film) {
+  this.title = film.title;
+  this.overview = film.overview;
+  this.average_votes = film.vote_average;
+  this.total_votes = film.vote_count;
+  this.image_url = `https://image.tmdb.org/t/p/w500${film.poster_path}`;
+  this.popularity = film.popularity;
+  this.released_on = film.release_date;
+  this.created_at = Date.now();
+}
+
+Movie.tableName = 'movies';
+
+Movie.lookUp = lookUp;
+
+Movie.prototype.save = function(location_id) {
+  const SQL = `INSERT INTO ${Movie.tableName} (title, overview, average_vote, total_votes, image_url, popularity, released_on, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`;
+  const values = [this.title, this.overview, this.average_votes, this.total_votes, this.image_url, this.popularity, this.released_on, this.created_at, location_id];
+
+  client.query(SQL, values);
 }
 
 // Generic lookUp function
